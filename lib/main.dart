@@ -20,6 +20,14 @@ class _CryptoAppState extends State<CryptoApp> {
     'TAO': 'Loading...'
   };
 
+  // Stocke les quantités possédées
+  Map<String, double> ownedCrypto = {
+    'BTC': 2.0,
+    'AXL': 0.0,
+    'OSMO': 0.0,
+    'TAO': 0.0
+  };
+
   // Fonction pour récupérer les prix depuis l'API Binance
   Future<void> fetchPrices() async {
     final url = Uri.parse('https://api.binance.com/api/v3/ticker/price?symbols=["BTCUSDT","AXLUSDT","OSMOUSDT","TAOUSDT"]');
@@ -46,6 +54,71 @@ class _CryptoAppState extends State<CryptoApp> {
     }
   }
 
+  // Fonction pour afficher le menu et modifier les valeurs possédées
+  void _showCryptoDialog() {
+    String selectedCrypto = 'BTC';
+    TextEditingController amountController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Choisissez votre crypto et quantité"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButton<String>(
+                value: selectedCrypto,
+                onChanged: (String? newValue) {
+                  setState(() {
+                    selectedCrypto = newValue!;
+                  });
+                },
+                items: ownedCrypto.keys.map<DropdownMenuItem<String>>((String key) {
+                  return DropdownMenuItem<String>(
+                    value: key,
+                    child: Text(key),
+                  );
+                }).toList(),
+              ),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: "Quantité possédée"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text("Annuler"),
+              onPressed: () => Navigator.pop(context),
+            ),
+            TextButton(
+              child: Text("OK"),
+              onPressed: () {
+                setState(() {
+                  ownedCrypto[selectedCrypto] = double.tryParse(amountController.text) ?? 0.0;
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Fonction pour calculer la valeur totale
+  double getTotalValue() {
+    double total = 0.0;
+    prices.forEach((key, value) {
+      if (value != 'Loading...' && value != 'Error') {
+        total += (ownedCrypto[key] ?? 0) * double.parse(value);
+      }
+    });
+    return total;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -68,12 +141,17 @@ class _CryptoAppState extends State<CryptoApp> {
           title: Text('Crypto Tracker', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           backgroundColor: Colors.blueGrey[900],
           centerTitle: true,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.edit),
+              onPressed: _showCryptoDialog,
+            ),
+          ],
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Affichage des prix des cryptos avec des cartes stylisées
               for (var key in prices.keys)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -90,11 +168,17 @@ class _CryptoAppState extends State<CryptoApp> {
                       ],
                     ),
                     padding: EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-                    child: Text('$key: ${prices[key]}', style: TextStyle(fontSize: 20, color: Colors.white)),
+                    child: Column(
+                      children: [
+                        Text('$key: ${prices[key]}', style: TextStyle(fontSize: 20, color: Colors.white)),
+                        Text('Possédé: ${ownedCrypto[key]}', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
                   ),
                 ),
               SizedBox(height: 20),
-              // Bouton pour actualiser les prix
+              Text('Valeur totale: ${getTotalValue().toStringAsFixed(2)} USD', style: TextStyle(fontSize: 22, color: Colors.green)),
+              SizedBox(height: 20),
               ElevatedButton(
                 onPressed: fetchPrices,
                 style: ElevatedButton.styleFrom(
